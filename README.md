@@ -9,9 +9,13 @@ Changes to default map when server is empty
 
 
 ## CVars:
+<details><summary>Click to View CVars</summary>
 <p>
+
 * **togdefaultmap_map** - Map to change to when the server is empty.
 </p>
+</details>
+
 
 Note: After changing the cvars in your cfg file, be sure to rcon the new values to the server so that they take effect immediately.
 
