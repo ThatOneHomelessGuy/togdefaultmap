@@ -24,12 +24,14 @@ Note: After changing the cvars in your cfg file, be sure to rcon the new values 
 ## Changelog:
 <details>
 <summary>Click to Open Spoiler</summary>
-<p>
-	1.0
-		*	Initial creation.
+	1.0.2
+		*	Added check for if current map is the default to ensure it doesnt try to map change if it is already on the correct map.
+		*	Added timer validation to make sure that timers from the previous map dont fire in the next.
+			They shouldnt due to flag TIMER_FLAG_NO_MAPCHANGE, but there is documentation out there than notes that TIMER_FLAG_NO_MAPCHANGE has some bugs.
 	1.0.1
 		*	Updated to new syntax.
-</p>
+	1.0
+		*	Initial creation.
 </details>
 
 
