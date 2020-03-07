@@ -1,5 +1,5 @@
 #pragma semicolon 1
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 
 #include <sourcemod>
 #include <autoexecconfig>
@@ -7,7 +7,9 @@
 #pragma newdecls required
 
 Handle g_hMap = INVALID_HANDLE;
-char g_sMap[30];
+char g_sMap[PLATFORM_MAX_PATH];
+
+int g_iTimerValidation = 0;
 
 bool g_iMapStart = true;
 bool g_iRoundEnd = true;
@@ -29,6 +31,7 @@ public void OnPluginStart()
 	g_hMap = AutoExecConfig_CreateConVar("togdefaultmap_map", "de_dust2", "Map to change to when the server is empty.");
 	HookConVarChange(g_hMap, OnCVarChange);
 	GetConVarString(g_hMap, g_sMap, sizeof(g_sMap));
+	ReplaceString(g_sMap, sizeof(g_sMap), ".bsp", "", false);
 	
 	AutoExecConfig_ExecuteFile();
 	AutoExecConfig_CleanFile();
@@ -43,19 +46,24 @@ public void OnCVarChange(Handle hCVar, const char[] sOldValue, const char[] sNew
 	if(hCVar == g_hMap)
 	{
 		GetConVarString(g_hMap, g_sMap, sizeof(g_sMap));
+		ReplaceString(g_sMap, sizeof(g_sMap), ".bsp", "", false);
 	}
 }
 
 public void OnMapStart()
 {
+	g_iTimerValidation++;
 	g_iMapStart = true;
-	CreateTimer(60.0, TimerCallback_MapStart, _, TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(60.0, TimerCallback_MapStart, g_iTimerValidation, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action TimerCallback_MapStart(Handle hTimer)
+public Action TimerCallback_MapStart(Handle hTimer, any iTimerValidation)
 {
-	g_iMapStart = false;
-	CheckCount();
+	if(iTimerValidation == g_iTimerValidation)
+	{
+		g_iMapStart = false;
+		CheckCount();
+	}
 }
 
 public Action Event_RoundStart(Handle hEvent, const char[] sName, bool bDontBroadcast)
@@ -89,34 +97,34 @@ void CheckCount()
 		
 		if(!iCount)
 		{
-			char sMsg[128];
-			Format(sMsg, sizeof(sMsg), "Server is empty! Changing to %s.", g_sMap);
-			ForceChangeLevel(g_sMap, sMsg);
+			char g_sMapName[PLATFORM_MAX_PATH], sMsg[128];
+			GetCurrentMap(g_sMapName, sizeof(g_sMapName));
+			ReplaceString(g_sMapName, sizeof(g_sMapName), ".bsp", "", false);
+			if(!StrEqual(g_sMapName, g_sMap, false))
+			{
+				Format(sMsg, sizeof(sMsg), "Server is empty! Changing to %s.", g_sMap);
+				ForceChangeLevel(g_sMap, sMsg);
+			}
 		}
 	}
-	CreateTimer(60.0, TimerCallback_Retry, _, TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(60.0, TimerCallback_Retry, g_iTimerValidation, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action TimerCallback_Retry(Handle hTimer)
+public Action TimerCallback_Retry(Handle hTimer, any iTimerValidation)
 {
-	CheckCount();
+	if(iTimerValidation == g_iTimerValidation)
+	{
+		CheckCount();
+	}
 }
 
-bool IsValidClient(int client, bool bAllowBots = false, bool bAllowDead = true)
+bool IsValidClient(int client)
 {
-	if(!(1 <= client <= MaxClients) || !IsClientInGame(client) || (IsFakeClient(client) && !bAllowBots) || (!IsPlayerAlive(client) && !bAllowDead))
+	if(!(1 <= client <= MaxClients) || !IsClientInGame(client) || (IsFakeClient(client)))
 	{
 		return false;
 	}
 	return true;
-}
-
-stock void Log(char[] sPath, const char[] sMsg, any ...)		//TOG logging function - path is relative to logs folder.
-{
-	char sLogFilePath[PLATFORM_MAX_PATH], sFormattedMsg[1500];
-	BuildPath(Path_SM, sLogFilePath, sizeof(sLogFilePath), "logs/%s", sPath);
-	VFormat(sFormattedMsg, sizeof(sFormattedMsg), sMsg, 3);
-	LogToFileEx(sLogFilePath, "%s", sFormattedMsg);
 }
 
 /*
@@ -125,5 +133,9 @@ CHANGELOG:
 		*	Initial creation.
 	1.0.1
 		*	Updated to new syntax.
+	1.0.2
+		*	Added check for if current map is the default to ensure it doesnt try to map change if it is already on the correct map.
+		*	Added timer validation to make sure that timers from the previous map dont fire in the next.
+			They shouldnt due to flag TIMER_FLAG_NO_MAPCHANGE, but there is documentation out there than notes that TIMER_FLAG_NO_MAPCHANGE has some bugs.
 		
 */
